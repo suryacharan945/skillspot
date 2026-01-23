@@ -135,10 +135,6 @@ Secure cloud infrastructure with HTTPS
 
 😊 User satisfaction score: 4.7 / 5
 
-📷 Screenshots
-
-📌 Screenshots of the Student Dashboard, NGO Admin Dashboard, and AI Chatbot can be found in the /screenshots folder (recommended to add for GitHub clarity).
-
 🔮 Future Enhancements
 
 🌐 Multilingual support (Indian regional languages)
