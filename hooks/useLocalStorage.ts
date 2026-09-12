@@ -1,4 +1,4 @@
-import { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
 
 function getValueFromLocalStorage<T>(key: string, initialValue: T): T {
   if (typeof window === 'undefined') {

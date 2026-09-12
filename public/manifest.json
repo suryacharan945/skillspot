@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "SkillSpot 2.0 Vocational Ecosystem",
+  "short_name": "SkillSpot",
+  "description": "Multi-tenant vocational education and verified credential platform connecting NGOs, students, and employers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#1e1b4b",
+  "categories": ["education", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

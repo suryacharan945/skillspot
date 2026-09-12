@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   login: (user: User) => void;
   logout: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -20,50 +21,80 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateUserFromSession = async (session: Session | null) => {
     if (session?.user) {
+      try {
         const { data: profile, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching user profile:', error);
-            setUser(null);
-        } else if (profile) {
-            setUser(profile);
-        } else {
-            const provider = session.user.app_metadata.provider;
-            if (provider && provider !== 'email') {
-                const userEmail = session.user.email;
-                if (!userEmail) {
-                    console.error("OAuth user is missing an email. Cannot create profile.");
-                    await supabase.auth.signOut();
-                    setUser(null);
-                } else {
-                    const newUserProfile: Omit<User, 'password'> = {
-                      id: session.user.id,
-                      email: userEmail,
-                      name: session.user.user_metadata.full_name || userEmail.split('@')[0] || "New User",
-                      role: 'student',
-                    };
-                    const { error: insertError } = await supabase.from('users').insert(newUserProfile);
-                    if (insertError) {
-                      console.error('Error creating user profile for OAuth user:', insertError);
-                      sessionStorage.setItem('authError', 'rls_user_insert_policy_missing');
-                      await supabase.auth.signOut();
-                      setUser(null);
-                    } else {
-                      setUser(newUserProfile as User);
-                    }
-                }
-            } else {
-                console.warn(`User with email ${session.user.email} signed in but has no profile. Logging out.`);
-                await supabase.auth.signOut();
-                setUser(null);
-            }
+        if (profile) {
+          setUser(profile as User);
+          try {
+            localStorage.setItem('skillspot_demo_user', JSON.stringify(profile));
+          } catch {}
+          return;
         }
+
+        // Profile does not exist yet; construct user profile from OAuth session metadata
+        const userEmail = session.user.email || '';
+        const userName =
+          session.user.user_metadata?.full_name ||
+          session.user.user_metadata?.name ||
+          (userEmail ? userEmail.split('@')[0] : 'Student');
+        const userAvatar =
+          session.user.user_metadata?.avatar_url ||
+          session.user.user_metadata?.picture ||
+          undefined;
+
+        const newUserProfile: User = {
+          id: session.user.id,
+          email: userEmail,
+          name: userName,
+          role: 'student',
+          avatarUrl: userAvatar,
+        };
+
+        // Try upserting to public.users table so it is persisted in Supabase
+        const { error: upsertError } = await supabase.from('users').upsert(
+          {
+            id: newUserProfile.id,
+            email: newUserProfile.email,
+            name: newUserProfile.name,
+            role: newUserProfile.role,
+            avatarUrl: newUserProfile.avatarUrl,
+          },
+          { onConflict: 'id' }
+        );
+
+        if (upsertError) {
+          console.warn(
+            'Could not persist OAuth profile to public.users (likely RLS policy). Continuing with authenticated session:',
+            upsertError
+          );
+        }
+
+        // Crucial: ALWAYS keep authenticated OAuth user logged in
+        setUser(newUserProfile);
+        try {
+          localStorage.setItem('skillspot_demo_user', JSON.stringify(newUserProfile));
+        } catch {}
+      } catch (err) {
+        console.error('Error handling session profile:', err);
+        // Fallback user from session metadata so user is never locked out
+        const fallbackUser: User = {
+          id: session.user.id,
+          email: session.user.email || 'user@skillspot.org',
+          name: session.user.user_metadata?.full_name || 'Student',
+          role: 'student',
+        };
+        setUser(fallbackUser);
+        try {
+          localStorage.setItem('skillspot_demo_user', JSON.stringify(fallbackUser));
+        } catch {}
+      }
     } else {
-        setUser(null);
+      setUser(null);
     }
   };
 
@@ -75,10 +106,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
-        await updateUserFromSession(session);
+        if (session) {
+          await updateUserFromSession(session);
+        } else {
+          // Check demo user
+          try {
+            const savedDemo = localStorage.getItem('skillspot_demo_user');
+            if (savedDemo) {
+              setUser(JSON.parse(savedDemo));
+            } else {
+              setUser(null);
+            }
+          } catch {
+            setUser(null);
+          }
+        }
       } catch (error) {
         console.error('Error fetching initial user session:', error);
-        setUser(null);
+        try {
+          const savedDemo = localStorage.getItem('skillspot_demo_user');
+          setUser(savedDemo ? JSON.parse(savedDemo) : null);
+        } catch {
+          setUser(null);
+        }
       } finally {
         isFetchingSession = false;
         setLoading(false);
@@ -92,7 +142,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Only run the listener logic after the initial session fetch is complete.
         if (!isFetchingSession) {
           try {
-            await updateUserFromSession(session);
+            if (session) {
+              await updateUserFromSession(session);
+            } else {
+              const savedDemo = localStorage.getItem('skillspot_demo_user');
+              if (savedDemo) {
+                setUser(JSON.parse(savedDemo));
+              } else {
+                setUser(null);
+              }
+            }
           } catch (error) {
             console.error('Error handling auth state change:', error);
             setUser(null);
@@ -107,24 +166,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = (loggedInUser: User) => {
+    try {
+      localStorage.setItem('skillspot_demo_user', JSON.stringify(loggedInUser));
+    } catch {}
     setUser(loggedInUser);
+  };
+
+  const updateUser = (updates: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updates };
+      try {
+        localStorage.setItem('skillspot_demo_user', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to update demo user in storage', e);
+      }
+      return updated;
+    });
   };
 
   const logout = async () => {
     try {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-        // The onAuthStateChange listener will automatically handle setting the user to null.
-        // This avoids potential race conditions and relies on a single source of truth for auth state.
+      localStorage.removeItem('skillspot_demo_user');
+      const { error } = await supabase.auth.signOut();
+      if (error) console.warn('Supabase signout warning:', error);
     } catch (error) {
-        console.error('Error logging out:', error);
+      console.error('Error logging out:', error);
+    } finally {
+      setUser(null);
     }
   };
 
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isAuthenticated, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );

@@ -5,11 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SkillSpot 2.0</title>
+    <meta name="description" content="A multi-organization scalable platform to transform SkillSpot into a centralized skill ecosystem. It hosts multiple NGOs/training centers, each managing their own skill programs and student communities under a unified, tenant-based architecture." />
+    <meta property="og:title" content="SkillSpot 2.0" />
+    <meta property="og:description" content="A multi-organization scalable platform to transform SkillSpot into a centralized skill ecosystem." />
+    <meta name="theme-color" content="#1e1b4b" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/vite.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       // Configure Tailwind CSS to use the 'class' strategy for dark mode
       tailwind.config = {
         darkMode: 'class',
+      }
+      // Register service worker for offline viewing of credentials
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.warn('SW registration skipped:', err);
+          });
+        });
       }
     </script>
   <script type="importmap">

@@ -1,150 +1,112 @@
-🚀 SkillSpot 2.0
-AI-Empowered Multi-Tenant SaaS Platform for NGO-Driven Skill Development
+# 🌟 SkillSpot 2.0 - Multi-Tenant Vocational Skill Ecosystem & SaaS
 
-🔗 Live Application: https://skillspot-omega.vercel.app/
+SkillSpot 2.0 is a modern, multi-tenant Software-as-a-Service (SaaS) platform connecting Non-Governmental Organizations (NGOs), vocational skill training centers, learners, and enterprise employers under a unified digital infrastructure.
 
-📌 Project Overview
+---
 
-SkillSpot 2.0 is a web-based, multi-tenant Software-as-a-Service (SaaS) platform designed to connect Non-Governmental Organizations (NGOs) offering skill-development programs with learners seeking verified and accessible training opportunities.
+## 🚀 Key Modules & Capabilities
 
-The platform enables multiple NGOs to operate independently within a shared system while ensuring secure data isolation, real-time communication, and AI-assisted course discovery. Learners can browse NGOs, explore courses, apply online, track application status, and provide feedback — all through a unified interface.
+1. **Multi-Tenant NGO Administration**:
+   - Independent branding, tenant customization, custom domain slugs, and accreditation management.
+   - Comprehensive **Data Visualizations** (Enrollment & Retention trajectories, Core Competency radar, Track Mastery charts, Equipment utilization, and comparative NGO performance).
+   - **Executive PDF & CSV Report Generator**: Export accreditation-ready PDF dossiers and CSV spreadsheets for donor audits, board reviews, and offline archival.
+   - Real-time **SMS/Broadcast Messaging System** with urgency tags.
+   - **Workshop Equipment & Tool Inventory** tracker with maintenance schedules.
 
-SkillSpot 2.0 emphasizes digital inclusion, scalability, and human-centered design, making it suitable for community-focused education and social impact initiatives.
+2. **Student Learning & Vocational Portfolios**:
+   - Course discovery with interactive geo-mapping across verified NGOs.
+   - Milestone tracking, assignment submissions with instructor feedback rubrics.
+   - **Student Skill Portfolio Showcase** highlighting hands-on tools, capstone images, and verified credentials.
+   - Digital Certificates with tamper-proof verification hash and QR codes.
+   - Peer discussion forums with instructor answers and voting.
 
-🎯 Key Objectives
+3. **Career Advancement & Direct Hiring Pipeline**:
+   - **AI Trade Career Coach & Mock Interviewer**: Scenario-based technical and safety evaluations powered by Google Gemini AI.
+   - **Vocational Resume Builder**: One-click ATS-friendly resume export.
+   - **Employer Portal & Direct Hiring**: Post vocational jobs, review verified student certifications, and issue interview invitations.
+   - **Workshop & Maker Space Tool Lending Library**: Interactive facility map and machinery slot reservations.
 
-Digitize NGO-led skill development programs
+4. **Authentication & Multi-Role Access**:
+   - Email/Password authentication & **Google OAuth Sign-In**.
+   - Role-Based Access Control (RBAC): `student`, `admin`, and `employer`.
+   - Built-in one-click demo profiles for instant exploration.
 
-Enable secure multi-tenant operations for multiple NGOs
+---
 
-Simplify course discovery and enrollment for learners
+## 🗄️ Database Setup (Supabase)
 
-Integrate AI-powered natural-language search
+The project connects to Supabase with automated fallback to persistent client-side storage.
 
-Provide real-time updates and transparent workflows
+### Running the Database Migration
 
-Deliver a responsive and accessible user experience
+1. Open your Supabase Project: [`https://supabase.com/dashboard/project/keugczzhzfuomikwrldi`](https://supabase.com/dashboard/project/keugczzhzfuomikwrldi)
+2. Go to **SQL Editor** -> **New query**.
+3. Copy the entire contents of [`schema.sql`](./schema.sql) from this repository.
+4. Paste and click **Run**.
+5. This will:
+   - Upgrade existing tables (`ngos`, `users`, `enrollments`, `notifications`) with the required columns.
+   - Create missing tables: `workshop_equipment`, `placement_records`, `assignment_submissions`, `course_forum_posts`, `broadcast_messages`, `vocational_jobs`, `job_applications`, `student_portfolio_items`, `workshop_facilities`, `machine_reservations`, and `interview_invitations`.
+   - Set up Row Level Security (RLS) policies.
+   - Deploy the `on_auth_user_created` trigger that automatically provisions student profiles upon Google OAuth sign-in.
 
-👥 User Roles
-👨‍🎓 Students / Learners
+---
 
-Register using email or Google OAuth
+## 🔑 Enabling Google OAuth in Supabase
 
-Browse NGOs and available skill courses
+To enable **Sign in with Google**:
 
-Use AI chatbot to find relevant courses
+1. **Google Cloud Console**:
+   - Create an **OAuth 2.0 Client ID** (Application type: *Web application*).
+   - In **Authorized redirect URIs**, add:
+     ```
+     https://keugczzhzfuomikwrldi.supabase.co/auth/v1/callback
+     ```
+   - Copy your **Client ID** and **Client Secret**.
 
-Apply for courses with motivation details
+2. **Supabase Dashboard**:
+   - Go to **Authentication** -> **Providers** -> **Google**.
+   - Toggle Google to **Enabled**.
+   - Paste your **Client ID** and **Client Secret**, then click **Save**.
 
-Track application status (Pending / Approved / Rejected)
+3. **Redirect URLs**:
+   - Go to **Authentication** -> **URL Configuration**.
+   - In **Site URL**, set your primary domain (e.g. `https://suryacharan945.github.io/skillspot` or your Vercel/Cloud Run URL).
+   - In **Redirect URLs**, add wildcard `*` or your production and local URLs:
+     - `http://localhost:3000/*`
+     - `https://*.run.app/*`
+     - Your custom domain.
 
-Submit ratings and feedback after approval
+---
 
-🏢 NGO Administrators
+## 🛠️ Local Development & Scripts
 
-Self-register NGO and create admin account
+```bash
+# Install dependencies
+npm install
 
-Manage NGO profile and course listings (CRUD)
+# Start local development server
+npm run dev
 
-Review and process student applications
+# Build for production
+npm run build
+```
 
-Approve or reject enrollments
+---
 
-Receive real-time notifications
+## 📦 Updating GitHub Repository (`suryacharan945/skillspot`)
 
-Maintain full control over organization data
+To push these updates to your GitHub repository:
 
-✨ Core Features
+```bash
+# 1. Clone or sync your repository
+git remote add origin https://github.com/suryacharan945/skillspot.git
 
-✅ Multi-Tenant Architecture with secure tenant isolation
+# 2. Stage all updated files
+git add .
 
-🤖 AI Chatbot (Google Gemini API) for conversational course discovery
+# 3. Commit the changes
+git commit -m "feat: upgrade SkillSpot 2.0 with data visualizations, report exports, schema migration and Google OAuth fix"
 
-🔐 Secure Authentication (Google OAuth + Email/Password)
-
-📬 Real-Time Notifications for enrollment updates
-
-⭐ Course Reviews & Ratings by students
-
-🌗 Light/Dark Mode with preference persistence
-
-📱 Fully Responsive UI (desktop, tablet, mobile)
-
-☁️ Cloud-Hosted & Scalable Deployment
-
-🧠 AI Chatbot Capabilities
-
-The integrated chatbot allows users to ask questions such as:
-
-“Are there any free computer courses near Vijayawada?”
-
-“Which NGOs offer healthcare training this month?”
-
-The chatbot:
-
-Understands natural language queries
-
-Retrieves contextual data from the platform database
-
-Returns accurate NGO and course recommendations
-
-Supports follow-up questions within the same session
-
-🏗️ System Architecture
-
-SkillSpot 2.0 follows a layered cloud architecture:
-
-Frontend: React + Tailwind CSS
-
-Backend: Supabase (PostgreSQL + Auth + Realtime)
-
-Security: Row Level Security (RLS) for tenant isolation
-
-AI Layer: Google Gemini API
-
-Hosting: Vercel (Frontend) + Supabase Cloud (Backend)
-
-Each NGO operates as an independent tenant using a shared database schema with strict access policies.
-
-🛠️ Technology Stack
-Category	Technologies
-Frontend	React, Tailwind CSS
-Backend	Supabase (PostgreSQL, Auth, Realtime)
-AI	Google Gemini API
-Authentication	Google OAuth, Email/Password
-Security	Supabase Row Level Security (RLS)
-Hosting	Vercel
-Version Control	Git & GitHub
-🔐 Security & Privacy
-
-Tenant-level data isolation using Row Level Security (RLS)
-
-JWT-based authentication for all API calls
-
-Role-based access control (Student / NGO Admin)
-
-Secure cloud infrastructure with HTTPS
-
-📊 Performance Highlights
-
-⚡ Average API response time: 180–220 ms
-
-👥 Supports 150+ concurrent users
-
-🤖 Chatbot accuracy: 87.4%
-
-😊 User satisfaction score: 4.7 / 5
-
-🔮 Future Enhancements
-
-🌐 Multilingual support (Indian regional languages)
-
-📊 Advanced analytics dashboards for NGOs
-
-📱 Dedicated mobile application
-
-🎓 Blockchain-based certificate verification
-
-🔗 Integration with government skill portals (Skill India, NSDC)
-
-🧠 AI-driven skill demand prediction
+# 4. Push to main branch
+git push -u origin main
+```

@@ -5,23 +5,33 @@ import NgoDetailPage from './pages/NgoDetailPage';
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/AdminDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import JobBoardPage from './pages/JobBoardPage';
+import VerifyCertificatePage from './pages/VerifyCertificatePage';
+import CareerCoachPage from './pages/CareerCoachPage';
+import EmployerPortalPage from './pages/EmployerPortalPage';
+import WorkshopMapPage from './pages/WorkshopMapPage';
+import RegisterNgoPage from './pages/RegisterNgoPage';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Chatbot from './components/Chatbot';
+import RealtimeNotificationToasts from './components/RealtimeNotificationToasts';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ThemeProvider } from './theme/ThemeContext';
 import { DataProvider } from './data/DataContext';
+import { LanguageProvider } from './i18n/LanguageContext';
 
-const PrivateRoute: React.FC<{ children: ReactElement, role: 'admin' | 'student' }> = ({ children, role }) => {
-    const { isAuthenticated, user } = useAuth();
-    if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
-    }
-    if (user?.role !== role) {
-        // If wrong role, redirect to home or a dedicated 'unauthorized' page
-        return <Navigate to="/" replace />;
-    }
-    return children;
+const PrivateRoute: React.FC<{ children: ReactElement; role: 'admin' | 'student' }> = ({
+  children,
+  role,
+}) => {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user?.role !== role) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
 };
 
 const AppContent: React.FC = () => {
@@ -32,40 +42,51 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/ngo/:ngoId" element={<NgoDetailPage />} />
+          <Route path="/jobs" element={<JobBoardPage />} />
+          <Route path="/coach" element={<CareerCoachPage />} />
+          <Route path="/employers" element={<EmployerPortalPage />} />
+          <Route path="/workshops" element={<WorkshopMapPage />} />
+          <Route path="/verify" element={<VerifyCertificatePage />} />
+          <Route path="/verify/:certificateId" element={<VerifyCertificatePage />} />
+          <Route path="/register-ngo" element={<RegisterNgoPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route 
-            path="/admin-dashboard" 
+          <Route
+            path="/admin-dashboard"
             element={
               <PrivateRoute role="admin">
                 <AdminDashboard />
               </PrivateRoute>
-            } 
+            }
           />
-          <Route 
-            path="/student-dashboard" 
+          <Route
+            path="/student-dashboard"
             element={
               <PrivateRoute role="student">
                 <StudentDashboard />
               </PrivateRoute>
-            } 
+            }
           />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       <Chatbot />
+      <RealtimeNotificationToasts />
       <Footer />
     </div>
   );
-}
+};
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <DataProvider>
-          <HashRouter>
-            <AppContent />
-          </HashRouter>
-        </DataProvider>
+        <LanguageProvider>
+          <DataProvider>
+            <HashRouter>
+              <AppContent />
+            </HashRouter>
+          </DataProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </AuthProvider>
   );

@@ -1,271 +1,56 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useData } from '../data/DataContext';
 import NgoCard from '../components/NgoCard';
 import NgoCardSkeleton from '../components/NgoCardSkeleton';
+import { ImpactStatsGlassSkeleton } from '../components/skeletons/GlassSkeleton';
 import DataFetchError from '../components/DataFetchError';
-import { NGO, User } from '../types';
-import { supabase } from '../lib/supabaseClient';
-
-// --- Icons for new sections ---
-const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>;
-const BookIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>;
-const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
-const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
-const ClipboardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>;
-const ChartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
-
-
-const RegistrationModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-}> = ({ isOpen, onClose }) => {
-    const { fetchNgos, fetchUsers } = useData();
-    
-    // Form state
-    const [ngoName, setNgoName] = useState('');
-    const [ngoDescription, setNgoDescription] = useState('');
-    const [ngoLocation, setNgoLocation] = useState('');
-    const [ngoType, setNgoType] = useState<'Community Development' | 'Education' | 'Environmental' | 'Healthcare'>('Education');
-    const [contactEmail, setContactEmail] = useState('');
-    const [contactPhone, setContactPhone] = useState('');
-    const [contactWebsite, setContactWebsite] = useState('');
-    const [adminName, setAdminName] = useState('');
-    const [adminEmail, setAdminEmail] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
-    const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
-    
-    // Control state
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
-
-    const resetForm = () => {
-        setNgoName('');
-        setNgoDescription('');
-        setNgoLocation('');
-        setNgoType('Education');
-        setContactEmail('');
-        setContactPhone('');
-        setContactWebsite('');
-        setAdminName('');
-        setAdminEmail('');
-        setAdminPassword('');
-        setAdminConfirmPassword('');
-        setError('');
-        setIsLoading(false);
-        setIsSuccess(false);
-        setSuccessMessage('');
-    };
-
-    const handleClose = () => {
-        resetForm();
-        onClose();
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-
-        if (adminPassword !== adminConfirmPassword) {
-            setError('Admin passwords do not match.');
-            return;
-        }
-
-        setIsLoading(true);
-        let ngoJustCreated: { id: string } | null = null;
-
-
-        try {
-            // Step 1: Sign up the admin user with Supabase Auth
-            const { data: authData, error: signUpError } = await supabase.auth.signUp({
-                email: adminEmail,
-                password: adminPassword,
-            });
-
-            if (signUpError) throw signUpError;
-            if (!authData.user) throw new Error("Admin account creation failed.");
-
-            // Step 2: Create the NGO
-            const slug = ngoName.toLowerCase().replace(/\s+/g, '-');
-            const uniqueSuffix = Date.now().toString().slice(-5);
-            const ngoId = `${slug}-${uniqueSuffix}`;
-
-            const newNgo: Omit<NGO, 'courses'> = {
-                id: ngoId,
-                name: ngoName,
-                description: ngoDescription,
-                location: ngoLocation,
-                type: ngoType,
-                contact: { email: contactEmail, phone: contactPhone, website: contactWebsite },
-            };
-
-            const { data: createdNgo, error: ngoError } = await supabase.from('ngos').insert({ ...newNgo, courses: [] }).select('id').single();
-            if (ngoError) throw ngoError;
-            ngoJustCreated = createdNgo;
-            
-            // Step 3: Create the admin profile in the public 'users' table
-            const newAdminProfile = {
-                id: authData.user.id,
-                name: adminName,
-                email: adminEmail,
-                role: 'admin' as const,
-                ngoId: ngoId,
-            };
-
-            const { error: userError } = await supabase.from('users').insert(newAdminProfile);
-            if (userError) throw userError;
-
-            // Refetch data to update the UI
-            await Promise.all([fetchNgos(), fetchUsers()]);
-            
-            if (authData.session === null) {
-                setSuccessMessage('Your NGO has been successfully registered. Please check your email to confirm your admin account. Once confirmed, you can log in.');
-            } else {
-                setSuccessMessage('Your NGO has been successfully registered. You can now log in with the admin credentials you created.');
-            }
-            setIsSuccess(true);
-
-        } catch (err: any) {
-            // If any step after NGO creation fails, attempt to clean up the NGO record.
-            if (ngoJustCreated) {
-                console.warn("Registration failed after NGO creation. Cleaning up orphaned NGO record.", ngoJustCreated.id);
-                await supabase.from('ngos').delete().eq('id', ngoJustCreated.id);
-            }
-
-            let errorMessage = 'An unexpected error occurred during registration.';
-            if (err instanceof Error) errorMessage = err.message;
-            else if (err && typeof err === 'object' && 'message' in err) {
-                const msg = (err as { message: unknown }).message;
-                if (typeof msg === 'string') errorMessage = msg;
-            } else if (typeof err === 'string') errorMessage = err;
-            
-            if (errorMessage.toLowerCase().includes('user already registered')) {
-                setError(`Registration Failed: An account with the email "${adminEmail}" already exists. This may be due to a previous incomplete registration. Please try logging in, resetting your password, or use a different email address.`);
-            } else if (errorMessage.toLowerCase().includes('violates row-level security policy for table "users"')) {
-                setError(
-`Registration Failed: Your admin account was created, but your user profile could not be saved due to a database security rule. Your NGO data was not saved.
-
-Because your email is now registered, you will need to use a different email for your next attempt after fixing the issue below.
-
-Error Details: Your database's security rules are blocking new user registrations. To fix this, run the following command in your Supabase SQL Editor:
-
-CREATE POLICY "Allow users to insert their own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);`
-                );
-            } else if (errorMessage.toLowerCase().includes("could not find the 'ngoid' column")) {
-                setError(
-`Database Schema Error: Your 'users' table is missing the 'ngoId' column. The registration process has been halted. Please fix your database schema before trying again.
-
-To fix this, please go to your Supabase project's SQL Editor and run the following command:
-
-ALTER TABLE public.users ADD COLUMN "ngoId" text;`
-                );
-            } else if (errorMessage.toLowerCase().includes('email signups are disabled')) {
-                setError("Registration failed: Email signups are currently disabled. To fix this, please go to your Supabase project dashboard and enable the 'Email' provider under Authentication > Providers.");
-            } else {
-                setError(`Registration failed: ${errorMessage}`);
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    if (!isOpen) return null;
-    
-    const inputClasses = "w-full px-4 py-2 border rounded-lg bg-white text-gray-900 border-gray-300 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400";
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                {isSuccess ? (
-                     <div className="text-center">
-                        <svg className="mx-auto h-16 w-16 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <h3 className="mt-4 text-2xl font-bold text-gray-900 dark:text-white">Registration Successful!</h3>
-                        <p className="mt-2 text-gray-600 dark:text-gray-300">
-                            {successMessage}
-                        </p>
-                        <div className="mt-8">
-                            <button 
-                                onClick={handleClose} 
-                                className="w-full px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
-                            >
-                                Continue
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Register Your NGO</h2>
-                            <button onClick={handleClose} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">&times;</button>
-                        </div>
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* NGO Details */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2 dark:border-gray-600 text-gray-900 dark:text-white">NGO Information</h3>
-                                    <input type="text" placeholder="NGO Name" value={ngoName} onChange={e => setNgoName(e.target.value)} required className={inputClasses} />
-                                    <textarea placeholder="Description" value={ngoDescription} onChange={e => setNgoDescription(e.target.value)} required className={inputClasses} rows={3}></textarea>
-                                    <input type="text" placeholder="Location (e.g., City, State)" value={ngoLocation} onChange={e => setNgoLocation(e.target.value)} required className={inputClasses} />
-                                    <select value={ngoType} onChange={e => setNgoType(e.target.value as any)} className={inputClasses}>
-                                        <option value="Education">Education</option>
-                                        <option value="Community Development">Community Development</option>
-                                        <option value="Environmental">Environmental</option>
-                                        <option value="Healthcare">Healthcare</option>
-                                    </select>
-                                    <input type="email" placeholder="Contact Email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required className={inputClasses} />
-                                    <input type="tel" placeholder="Contact Phone" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required className={inputClasses} />
-                                    <input type="url" placeholder="Website URL" value={contactWebsite} onChange={e => setContactWebsite(e.target.value)} required className={inputClasses} />
-                                </div>
-                                {/* Admin Details */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold border-b pb-2 dark:border-gray-600 text-gray-900 dark:text-white">Admin Account</h3>
-                                    <input type="text" placeholder="Admin Full Name" value={adminName} onChange={e => setAdminName(e.target.value)} required className={inputClasses} />
-                                    <input type="email" placeholder="Admin Email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} required className={inputClasses} />
-                                    <input type="password" placeholder="Admin Password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} required className={inputClasses} />
-                                    <input type="password" placeholder="Confirm Admin Password" value={adminConfirmPassword} onChange={e => setAdminConfirmPassword(e.target.value)} required className={inputClasses} />
-                                </div>
-                            </div>
-                            {error && (
-                                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg mt-4">
-                                    <p className="whitespace-pre-wrap text-left font-mono">{error}</p>
-                                </div>
-                            )}
-                            <div className="flex justify-end pt-4">
-                                <button type="submit" disabled={isLoading} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:bg-blue-400">
-                                    {isLoading ? 'Registering...' : 'Register'}
-                                </button>
-                            </div>
-                        </form>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-};
-
+import { NGO } from '../types';
+import NgoMapLocator from '../components/NgoMapLocator';
+import RegisterNgoModal from '../components/RegisterNgoModal';
+import {
+  Building2,
+  BookOpen,
+  Users,
+  Award,
+  Search,
+  MapPin,
+  Sparkles,
+  LayoutGrid,
+  Map,
+  ArrowRight,
+  CheckCircle2,
+  Filter,
+  PlusCircle,
+  Zap,
+  Mic,
+  Heart,
+  Wrench,
+  Compass,
+  Briefcase,
+} from 'lucide-react';
 
 const HomePage: React.FC = () => {
   const { ngos, enrollments, loading, error } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const stats = useMemo(() => {
     const totalNgos = ngos.length;
     const totalCourses = ngos.reduce((acc, ngo) => acc + (ngo.courses?.length || 0), 0);
     const approvedEnrollments = enrollments.filter(e => e.status === 'Approved').length;
-    return { totalNgos, totalCourses, approvedEnrollments };
+    const completedCertificates = enrollments.filter(e => e.status === 'Completed').length;
+    return { totalNgos, totalCourses, approvedEnrollments, completedCertificates };
   }, [ngos, enrollments]);
 
   const uniqueNgoTypes = useMemo(() => {
     const types = new Set(ngos.map(ngo => ngo.type));
     return ['All', ...Array.from(types)];
   }, [ngos]);
-  
+
   const uniqueLocations = useMemo(() => {
     const locations = new Set(ngos.map(ngo => ngo.location));
     return ['', ...Array.from(locations)];
@@ -273,20 +58,32 @@ const HomePage: React.FC = () => {
 
   const filteredNgos = useMemo(() => {
     return ngos.filter(ngo => {
-      const matchesSearch = ngo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            ngo.description.toLowerCase().includes(searchTerm.toLowerCase());
+      if (!ngo) return false;
+      const matchesSearch =
+        (ngo.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (ngo.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ngo.courses?.some(c => (c?.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesType = typeFilter === 'All' || ngo.type === typeFilter;
       const matchesLocation = locationFilter === '' || ngo.location === locationFilter;
-      
+
       return matchesSearch && matchesType && matchesLocation;
     });
   }, [ngos, searchTerm, typeFilter, locationFilter]);
 
+  const scrollToDirectory = () => {
+    const element = document.getElementById('directory-section');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {Array.from({ length: 3 }).map((_, index) => <NgoCardSkeleton key={index} />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <NgoCardSkeleton key={index} />
+          ))}
         </div>
       );
     }
@@ -296,11 +93,31 @@ const HomePage: React.FC = () => {
     }
 
     if (filteredNgos.length === 0) {
-      return <p className="text-center text-gray-500 dark:text-gray-400 text-lg mt-8">No NGOs found matching your criteria.</p>;
+      return (
+        <div className="text-center py-16 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 max-w-xl mx-auto shadow-sm">
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/40 text-blue-500 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4">
+            🔍
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Training Centers Found</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-6">
+            We couldn't find any centers matching "{searchTerm || typeFilter}". Try clearing your filters or exploring all available programs.
+          </p>
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setTypeFilter('All');
+              setLocationFilter('');
+            }}
+            className="px-5 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-all shadow-sm"
+          >
+            Reset All Filters
+          </button>
+        </div>
+      );
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredNgos.map((ngo: NGO) => (
           <NgoCard key={ngo.id} ngo={ngo} />
         ))}
@@ -310,105 +127,405 @@ const HomePage: React.FC = () => {
 
   return (
     <>
-      <div className="space-y-16">
-        {/* --- HERO SECTION --- */}
-        <div className="text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white">Empowering Skills, Building Futures</h1>
-          <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Discover opportunities for skill development. Connect with NGOs making a real impact in communities.
-          </p>
-          <div className="mt-8">
-            <button
-                onClick={() => setIsRegisterModalOpen(true)}
-                className="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition-transform transform hover:scale-105"
-            >
-                Register Your NGO
-            </button>
-          </div>
-        </div>
+      <div className="space-y-12 sm:space-y-16">
         
-        {/* --- IMPACT STATISTICS --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center justify-center space-x-4">
-                <BuildingIcon />
-                <div>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{loading ? '...' : stats.totalNgos}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Partner NGOs</p>
-                </div>
+        {/* --- DYNAMIC HERO SECTION --- */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-950 text-white p-8 sm:p-14 shadow-2xl border border-indigo-500/20">
+          
+          {/* Animated Background Gradients & Glow Circles */}
+          <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
+          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none animate-pulse-glow" style={{ animationDelay: '2s' }} />
+          
+          <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6">
+            
+            {/* Live Indicator Pill */}
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold shadow-inner">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span className="text-emerald-300 font-bold">Live Network Active</span>
+              <span className="text-white/40">•</span>
+              <span className="text-gray-200">2026 Vocational Cohorts Enrolling</span>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center justify-center space-x-4">
-                <BookIcon />
-                <div>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{loading ? '...' : stats.totalCourses}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Courses Offered</p>
-                </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center justify-center space-x-4">
-                <UsersIcon />
-                <div>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{loading ? '...' : stats.approvedEnrollments}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Students Empowered</p>
-                </div>
-            </div>
-        </div>
 
-        {/* --- HOW IT WORKS --- */}
-        <div className="bg-blue-600 dark:bg-blue-800 text-white p-8 rounded-lg">
-            <h2 className="text-3xl font-bold text-center mb-8">How It Works</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                <div className="flex flex-col items-center">
-                    <div className="bg-blue-500 dark:bg-blue-700 p-4 rounded-full mb-4"><SearchIcon /></div>
-                    <h3 className="text-xl font-semibold mb-2">1. Discover NGOs</h3>
-                    <p className="text-blue-200">Explore a directory of trusted organizations offering valuable skill-based courses.</p>
-                </div>
-                <div className="flex flex-col items-center">
-                    <div className="bg-blue-500 dark:bg-blue-700 p-4 rounded-full mb-4"><ClipboardIcon /></div>
-                    <h3 className="text-xl font-semibold mb-2">2. Enroll in Courses</h3>
-                    <p className="text-blue-200">Find a course that fits your goals and submit your enrollment request with a single click.</p>
-                </div>
-                <div className="flex flex-col items-center">
-                    <div className="bg-blue-500 dark:bg-blue-700 p-4 rounded-full mb-4"><ChartIcon /></div>
-                    <h3 className="text-xl font-semibold mb-2">3. Grow Your Skills</h3>
-                    <p className="text-blue-200">Gain new abilities, receive guidance from experts, and build your future.</p>
-                </div>
-            </div>
-        </div>
+            {/* Headline */}
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight sm:leading-none">
+              Empowering Real Skills.{' '}
+              <span className="bg-gradient-to-r from-blue-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
+                Building Futures.
+              </span>
+            </h1>
 
+            {/* Subheading */}
+            <p className="text-sm sm:text-lg text-indigo-100/90 max-w-2xl mx-auto font-normal leading-relaxed">
+              SkillSpot 2.0 unifies trusted NGOs, practical trade workshops, and verified credentials under one transparent decentralized ecosystem.
+            </p>
 
-        {/* --- NGO DIRECTORY LISTING --- */}
-        <div>
-          <h2 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">Our Partner NGOs</h2>
-          <div className="sticky top-16 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm py-4 z-40">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input
-                type="text"
-                placeholder="Search by name or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg bg-white text-gray-900 border-gray-300 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400"
-              />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            {/* Hero CTAs */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
+              <button
+                onClick={() => setIsRegisterModalOpen(true)}
+                className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 flex items-center space-x-2 transform hover:-translate-y-0.5"
               >
-                {uniqueNgoTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Types' : type}</option>)}
-              </select>
-              <select
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg bg-white text-gray-900 border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                <PlusCircle className="w-4 h-4" />
+                <span>Register Your NGO</span>
+              </button>
+
+              <button
+                onClick={scrollToDirectory}
+                className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm rounded-2xl border border-white/20 backdrop-blur-md transition-all duration-200 flex items-center space-x-2"
               >
-                {uniqueLocations.map(location => <option key={location} value={location}>{location === '' ? 'All Locations' : location}</option>)}
-              </select>
+                <Search className="w-4 h-4" />
+                <span>Browse Vocational Programs</span>
+              </button>
             </div>
-          </div>
-          <div className="mt-8">
-            {renderContent()}
+
+            {/* Quick Feature Pills */}
+            <div className="pt-4 flex flex-wrap justify-center items-center gap-4 text-xs text-indigo-200 font-medium">
+              <span className="flex items-center space-x-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Verified Certificates</span>
+              </span>
+              <span className="flex items-center space-x-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Zero Tuition Middlemen</span>
+              </span>
+              <span className="flex items-center space-x-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Proximity-Based Cohorts</span>
+              </span>
+            </div>
+
           </div>
         </div>
+
+        {/* --- VIBRANT IMPACT STATISTICS --- */}
+        {loading ? (
+          <ImpactStatsGlassSkeleton />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            
+            {/* Card 1: Partner NGOs */}
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700/80 transition-all flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
+                  {stats.totalNgos}
+                </p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Partner NGOs</p>
+              </div>
+            </div>
+
+            {/* Card 2: Active Courses */}
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700/80 transition-all flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
+                  {stats.totalCourses}
+                </p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Vocational Courses</p>
+              </div>
+            </div>
+
+            {/* Card 3: Students Enrolled */}
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700/80 transition-all flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
+                  {stats.approvedEnrollments}
+                </p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Active Students</p>
+              </div>
+            </div>
+
+            {/* Card 4: Certificates Issued */}
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700/80 transition-all flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">
+                  {stats.completedCertificates}
+                </p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Certificates Issued</p>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* --- HOW SKILLSPOT WORKS (STRUCTURED 3-STEP PATHWAY) --- */}
+        <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-purple-50/70 dark:from-gray-800/60 dark:via-gray-800/40 dark:to-gray-800/60 rounded-3xl p-8 sm:p-10 border border-blue-100/80 dark:border-gray-700">
+          <div className="text-center max-w-xl mx-auto mb-8">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-1">
+              Streamlined Pathway
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              How SkillSpot 2.0 Works
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Connecting eager learners with real-world community workshops in 3 steps
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Step 1 */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center relative group hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white font-bold text-lg flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                1
+              </div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">Explore Training Centers</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Filter verified NGOs by field, location distance, and curriculum structure to find hands-on vocational matches.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center relative group hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-bold text-lg flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                2
+              </div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">Apply for a Cohort</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Submit an enrollment application with your goals. The NGO team reviews and confirms your seat directly.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center relative group hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white font-bold text-lg flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                3
+              </div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">Master Skills & Get Certified</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Complete practical milestones, build your portfolio, and graduate with a cryptographically verifiable certificate.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        {/* --- NEXT-GEN VOCATIONAL ECOSYSTEM PILLARS --- */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 block mb-0.5">
+                Full-Lifecycle Vocational Ecosystem
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
+                Career Acceleration & Workshop Network
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Pillar 1: AI Trade Coach */}
+            <Link
+              to="/coach"
+              className="group p-5 bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent dark:from-blue-950/40 dark:via-indigo-950/20 bg-white dark:bg-gray-800 rounded-3xl border border-blue-200/60 dark:border-blue-800/40 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+            >
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                  <Mic className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  AI Trade Coach & Mock Interview
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Practice OSHA safety questions and technical scenarios with voice feedback & instant resumes.
+                </p>
+              </div>
+              <div className="pt-4 flex items-center text-xs font-bold text-blue-600 dark:text-blue-400">
+                <span>Start Practice</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            {/* Pillar 2: Employer Portal */}
+            <Link
+              to="/employers"
+              className="group p-5 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent dark:from-indigo-950/40 dark:via-purple-950/20 bg-white dark:bg-gray-800 rounded-3xl border border-indigo-200/60 dark:border-indigo-800/40 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+            >
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                  Employer Direct Hiring
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Source verified graduates, review workshop portfolios, and send direct apprenticeship offers.
+                </p>
+              </div>
+              <div className="pt-4 flex items-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                <span>Source Candidates</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            {/* Pillar 3: Workshop & Tool Map */}
+            <Link
+              to="/workshops"
+              className="group p-5 bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-transparent dark:from-teal-950/40 dark:via-cyan-950/20 bg-white dark:bg-gray-800 rounded-3xl border border-teal-200/60 dark:border-teal-800/40 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+            >
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                  <Compass className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                  Shared Workshop Map
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Locate regional maker labs and book time on heavy machinery, test benches, and laser bays.
+                </p>
+              </div>
+              <div className="pt-4 flex items-center text-xs font-bold text-teal-600 dark:text-teal-400">
+                <span>Find Labs & Reserve</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* --- NGO DIRECTORY & PROXIMITY RADAR SECTION --- */}
+        <div id="directory-section" className="space-y-6 pt-4">
+          
+          {/* Header Row + View Mode Switcher */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                  Partner Training Organizations
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 text-xs font-bold">
+                  {filteredNgos.length}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Browse verified institutes, workshop curriculums, and open training cohorts.
+              </p>
+            </div>
+
+            {/* View Mode Toggle (Grid vs Interactive Radar Map) */}
+            <div className="inline-flex rounded-xl p-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-inner">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-300 shadow-xs'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Directory Cards</span>
+              </button>
+
+              <button
+                onClick={() => setViewMode('map')}
+                className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  viewMode === 'map'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-300 shadow-xs'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Map className="w-3.5 h-3.5" />
+                <span>Proximity Radar Map</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Search & Filter Toolbar */}
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              
+              {/* Search input with Lucide Search icon */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Search by center name or skill..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-xs border rounded-xl bg-gray-50 text-gray-900 border-gray-200 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700/60 dark:text-white dark:border-gray-600 dark:placeholder-gray-400 transition-all"
+                />
+              </div>
+
+              {/* Type / Domain select */}
+              <div className="relative">
+                <Filter className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-xs border rounded-xl bg-gray-50 text-gray-900 border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700/60 dark:text-white dark:border-gray-600 transition-all"
+                >
+                  {uniqueNgoTypes.map(type => (
+                    <option key={type} value={type}>
+                      {type === 'All' ? 'All Domain Categories' : type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Location filter */}
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-xs border rounded-xl bg-gray-50 text-gray-900 border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700/60 dark:text-white dark:border-gray-600 transition-all"
+                >
+                  {uniqueLocations.map(location => (
+                    <option key={location} value={location}>
+                      {location === '' ? 'All Locations / Cities' : location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+            </div>
+
+            {/* Quick Category Chips */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {['All', 'Education', 'Community Development', 'Environmental', 'Healthcare'].map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setTypeFilter(category)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                    typeFilter === category
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {category === 'All' ? '🌟 All Domains' : category}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Directory Output: Grid vs Map */}
+          {viewMode === 'map' ? (
+            <NgoMapLocator ngos={filteredNgos} />
+          ) : (
+            <div className="mt-6">
+              {renderContent()}
+            </div>
+          )}
+
+        </div>
+
       </div>
-      <RegistrationModal isOpen={isRegisterModalOpen} onClose={() => setIsRegisterModalOpen(false)} />
+
+      {/* Structured Multi-Step NGO Registration Modal */}
+      <RegisterNgoModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+      />
     </>
   );
 };
