@@ -1,6 +1,39 @@
-# 🌟 SkillSpot 2.0 - Multi-Tenant Vocational Skill Ecosystem & SaaS
+# 🌟 SkillSpot 2.0 — Multi-Tenant Vocational Skill Ecosystem & SaaS
+
+[![SkillSpot CI](https://github.com/suryacharan945/skillspot/actions/workflows/ci.yml/badge.svg)](https://github.com/suryacharan945/skillspot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-19.2-blue)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20RLS-3ECF8E)](https://supabase.com/)
+[![Deployment: Vercel](https://img.shields.io/badge/Deployment-Vercel-black)](https://skillspot-eight.vercel.app)
 
 SkillSpot 2.0 is a modern, multi-tenant Software-as-a-Service (SaaS) platform connecting Non-Governmental Organizations (NGOs), vocational skill training centers, learners, and enterprise employers under a unified digital infrastructure.
+
+* **Live Web Application:** [https://skillspot-eight.vercel.app](https://skillspot-eight.vercel.app) (Alternative: [https://skillspot-omega.vercel.app](https://skillspot-omega.vercel.app))
+
+---
+
+## 🏛️ Architectural Overview & Multi-Tenancy
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        SKILLSPOT 2.0 ARCHITECTURE                       │
+└────────────────────────────────────────────────────────────────────────┘
+          │
+          ├── [Presentation Layer]: React 19, TypeScript, Tailwind CSS, Lucide Icons
+          │     ├── Student Portal: Interactive course discovery, geo-mapping, submission modals
+          │     ├── NGO Admin Portal: Multi-tenant dashboards, tool inventory, PDF report generator
+          │     └── Employer Portal: Verified credential lookup, vocational hiring pipeline
+          │
+          ├── [State & Data Layer]: React Context + Supabase JS Client (@supabase/supabase-js)
+          │     ├── Dynamic Supabase Synchronization (`lib/supabaseClient.ts`)
+          │     └── Offline Resilient Fallback: Static mock seed directory (`constants.ts`)
+          │
+          └── [Backend & Security Layer]: Supabase PostgreSQL Cloud
+                ├── 16 Relational Tables (`schema.sql` DDL)
+                ├── Multi-Tenant Isolation via Row-Level Security (RLS) policies
+                └── Auth: Google OAuth + Email/Password JWT Session guards
+```
 
 ---
 
@@ -33,9 +66,9 @@ SkillSpot 2.0 is a modern, multi-tenant Software-as-a-Service (SaaS) platform co
 
 ---
 
-## 🗄️ Database Setup (Supabase)
+## 🗄️ Database Setup & Row-Level Security (RLS)
 
-The project connects to Supabase with automated fallback to persistent client-side storage.
+The database schema and multi-tenant security policies are declared in [`schema.sql`](./schema.sql).
 
 ### Running the Database Migration
 
@@ -43,70 +76,34 @@ The project connects to Supabase with automated fallback to persistent client-si
 2. Go to **SQL Editor** -> **New query**.
 3. Copy the entire contents of [`schema.sql`](./schema.sql) from this repository.
 4. Paste and click **Run**.
-5. This will:
-   - Upgrade existing tables (`ngos`, `users`, `enrollments`, `notifications`) with the required columns.
-   - Create missing tables: `workshop_equipment`, `placement_records`, `assignment_submissions`, `course_forum_posts`, `broadcast_messages`, `vocational_jobs`, `job_applications`, `student_portfolio_items`, `workshop_facilities`, `machine_reservations`, and `interview_invitations`.
-   - Set up Row Level Security (RLS) policies.
-   - Deploy the `on_auth_user_created` trigger that automatically provisions student profiles upon Google OAuth sign-in.
+5. This deploys:
+   - 16 core relational tables (`ngos`, `users`, `enrollments`, `notifications`, `workshop_equipment`, `placement_records`, etc.).
+   - Explicit Row-Level Security (RLS) policies ensuring tenant and user data isolation.
+   - Automated `on_auth_user_created` trigger provisioning student profiles upon Google OAuth sign-in.
 
 ---
 
-## 🔑 Enabling Google OAuth in Supabase
-
-To enable **Sign in with Google**:
-
-1. **Google Cloud Console**:
-   - Create an **OAuth 2.0 Client ID** (Application type: *Web application*).
-   - In **Authorized redirect URIs**, add:
-     ```
-     https://keugczzhzfuomikwrldi.supabase.co/auth/v1/callback
-     ```
-   - Copy your **Client ID** and **Client Secret**.
-
-2. **Supabase Dashboard**:
-   - Go to **Authentication** -> **Providers** -> **Google**.
-   - Toggle Google to **Enabled**.
-   - Paste your **Client ID** and **Client Secret**, then click **Save**.
-
-3. **Redirect URLs**:
-   - Go to **Authentication** -> **URL Configuration**.
-   - In **Site URL**, set your primary domain (e.g. `https://suryacharan945.github.io/skillspot` or your Vercel/Cloud Run URL).
-   - In **Redirect URLs**, add wildcard `*` or your production and local URLs:
-     - `http://localhost:3000/*`
-     - `https://*.run.app/*`
-     - Your custom domain.
-
----
-
-## 🛠️ Local Development & Scripts
+## 🛠️ Local Development, Testing & Build
 
 ```bash
 # Install dependencies
 npm install
 
+# Run automated integrity test suite
+npm test
+
+# Type-check TypeScript
+npx tsc --noEmit
+
 # Start local development server
 npm run dev
 
-# Build for production
+# Build production bundle
 npm run build
 ```
 
 ---
 
-## 📦 Updating GitHub Repository (`suryacharan945/skillspot`)
+## 📄 License
 
-To push these updates to your GitHub repository:
-
-```bash
-# 1. Clone or sync your repository
-git remote add origin https://github.com/suryacharan945/skillspot.git
-
-# 2. Stage all updated files
-git add .
-
-# 3. Commit the changes
-git commit -m "feat: upgrade SkillSpot 2.0 with data visualizations, report exports, schema migration and Google OAuth fix"
-
-# 4. Push to main branch
-git push -u origin main
-```
+This project is licensed under the [MIT License](LICENSE).
